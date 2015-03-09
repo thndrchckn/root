@@ -1,0 +1,1211 @@
+#!/bin/bash
+#                                     CHOKE
+#                                     07/05
+echo "Start Firewall..."
+echo "Setting variables..."
+modprobe ip_conntrack_ftp
+
+EXCHANGE_EN="0"
+ADMIN="0"
+CONNECTION_TRACKING="1"
+LAWSON="0"
+COMMAND="0"
+
+LOOPBACK_INTERFACE="lo"
+
+DMZ_INT="eth0"
+DMZ_IPADDR="192.168.0.129"
+DMZ_ADDRS="192.168.0.128/27"
+DMZ_NET="192.168.0.128"
+DMZ_BCAST="192.168.0.159"
+
+PRIV_INT="eth1"
+PRIV_IPADDR="192.168.2.254"
+PRIV_ADDRS="192.168.2.0/24"
+PRIV_NET="192.168.2.0"
+PRIV_BCAST="192.168.2.255"
+PRIV_MASK="255.255.255.0"
+
+VPNZ_INT="eth2"
+VPNZ_IPADDR="192.168.0.193"
+VPNZ_ADDRS="192.168.0.192/27"
+VPNZ_NET="192.168.0.192"
+VPNZ_BCAST="192.168.0.223"
+VPNZ_MASK="255.255.255.224"
+
+FDZ_ADDRS="192.168.0.160/27"
+
+ANY="any/0"
+
+FW_ADMIN_ADDRS="/etc/rc.d/fw_admin_addrs"
+FW_ADS_ADDRS="/etc/rc.d/fw_ads_addrs"
+FW_ASHGROVE_ADDRS="/etc/rc.d/fw_ashgrove_addrs"
+FW_ALM_ADDRS="192.168.2.200/31"
+FW_AVAMAR_CLIENTS="/etc/rc.d/fw_avamar"
+FW_FTP_ADDRS="/etc/rc.d/fw_ftp_clnts"
+FW_GOTOMEETING_ADDRS="/etc/rc.d/fw_gotomeeting"
+FW_LRCPRIV_ADDRS="/etc/rc.d/fw_lrcpriv_addrs"
+FW_NS_ADDRS="192.168.0.140 192.168.0.141"
+FW_PRINTER_ADDRS="/etc/rc.d/fw_printer_addrs"
+FW_SRVR_ADDRS="/etc/rc.d/fw_srvr_addrs"
+FW_WEB_ADDRS="/etc/rc.d/fw_web_addrs"
+
+AVA1="192.168.2.227"
+AVA2="192.168.100.250"
+AVAMAR="192.168.2.227"
+BACKUPLRC="192.168.2.159"
+CEOLRC_IPADDR="192.168.2.101"
+DC1LRC="192.168.2.231"
+EPO1="192.168.2.197"
+EXCHANGE="192.168.0.132"
+ISPTR="192.168.2.185"
+LAWSON1="192.168.2.191"
+LRCORP_ADDRS="192.168.0.0/16"
+MULTI_ADDRS="192.168.200.0/24"
+NAS111GH="192.168.112.241"
+NDOR="www2.dor.state.ne.us"
+NETMON="192.168.2.209"
+NETSTAT="192.168.2.160"
+PPRESS="192.168.2.245"
+REMGATE="192.168.2.234"
+SYSLOG="192.168.2.152"
+SPAMFW="192.168.0.138"
+TMPNET="192.168.243.0/24"
+UNICAM="www.unicam.state.ne.us"
+VOIP_ADDRS="192.168.1.0/24"
+WEBMAIL="74.126.58.40"
+WEBPROXY="192.168.0.136"
+XBOX1_SRVR="192.168.2.158"
+
+LOOPBACK="127.0.0.0/8"
+CLASS_A="10.0.0.0/8"
+CLASS_B="172.16.0.0/12"
+CLASS_C="192.168.0.0/16"
+CLASS_D_MULTICAST="224.0.0.0/4"
+CLASS_E_RESERVED_NET="240.0.0.0/5"
+
+BROADCAST_SRC="0.0.0.0"
+BROADCAST_DEST="255.255.255.255"
+
+PRIVPORTS="0:1023"
+UNPRIVPORTS="1024:65535"
+
+NFS_PORT="2049"
+LOCKD_PORT="4045"
+SOCKS_PORT="1080"
+OPENWINDOWS_PORT="2000"
+XWINDOW_PORTS="6005:6063"
+SQUID_PORT="3128"
+SSH_PORTS="1024:65535"
+
+# traceroute usually uses -S 32769:65535 -D 33434:33523
+TRACEROUTE_SRC_PORTS="32769:65535"
+TRACEROUTE_DEST_PORTS="33434:33523"
+
+###############################################################
+echo "Kernel protection"
+# Enable broadcast echo Protection
+echo 1 > /proc/sys/net/ipv4/icmp_echo_ignore_broadcasts
+
+# Disable Source Routed Packets
+for     f in /proc/sys/net/ipv4/conf/*/accept_source_route; do
+        echo 0 > $f
+done
+
+# Enable TCP SYN Cookie Protection
+echo 1 > /proc/sys/net/ipv4/tcp_syncookies
+
+# Disable ICMP Redirect Acceptance
+for     f in /proc/sys/net/ipv4/conf/*/accept_redirects; do
+        echo 0 > $f
+done
+
+# Don't send Redirect Messages (Default=0)
+for      f in /proc/sys/net/ipv4/conf/*/send_redirects; do
+        echo 1 > $f
+done
+
+# Drop Spoofed Packets coming in on an interface, which if replied to,
+# would result in the reply going out a different interface.
+for f in /proc/sys/net/ipv4/conf/*/rp_filter; do
+  echo 1 > $f
+done
+
+# Turn off source address verification
+# KLIPS may no function if on
+for f in /proc/sys/net/ipv4/conf/*/rp_filter; do
+  echo 0 > $f
+done
+
+# Uncomment if using IPSec
+#for f in /proc/sys/net/ipv4/conf/ipsec0/rp_filter; do
+ # echo 0 > $f
+#done
+
+# Log packets with impossible addresses.
+for f in /proc/sys/net/ipv4/conf/*/log_martians; do
+        echo 0 > $f
+done
+
+for f in /proc/sys/net/ipv4/conf/eth0/log_martians; do
+        echo 0 > $f
+done
+
+for f in /proc/sys/net/ipv4/conf/eth1/log_martians; do
+        echo 0 > $f
+done
+
+for f in /proc/sys/net/ipv4/conf/eth2/log_martians; do
+        echo 0 > $f
+done
+###############################################################
+echo "Default Policy: DROP"
+# Remove any existing rules from all chains
+iptables --flush
+iptables -t nat --flush
+iptables -t mangle --flush
+
+# Unlimited traffic on the loopback interface
+iptables -A INPUT -i lo -j ACCEPT
+iptables -A OUTPUT -o lo -j ACCEPT
+
+
+# Set the default policy to drop
+iptables --policy INPUT   DROP
+iptables --policy OUTPUT  DROP
+iptables --policy FORWARD DROP
+
+iptables -t nat --policy PREROUTING ACCEPT
+iptables -t nat --policy OUTPUT ACCEPT
+iptables -t nat --policy POSTROUTING ACCEPT
+
+iptables -t mangle --policy PREROUTING ACCEPT
+iptables -t mangle --policy OUTPUT ACCEPT
+
+# Remove any pre_existing user-defined chains
+iptables --delete-chain
+iptables -t nat --delete-chain
+iptables -t mangle --delete-chain
+
+######################################
+iptables -A INPUT  -i $PRIV_INT -j ACCEPT
+iptables -A OUTPUT -o $PRIV_INT -j ACCEPT
+#iptables -A INPUT  -i $DMZ_INT -j ACCEPT
+#iptables -A OUTPUT -o $DMZ_INT -j ACCEPT
+iptables -A FORWARD -i $VPNZ_INT -o $VPNZ_INT -j ACCEPT
+iptables -A FORWARD -i $PRIV_INT -o $PRIV_INT -j ACCEPT
+iptables -A FORWARD -i $PRIV_INT -s $VOIP_ADDRS -o $VPNZ_INT -j ACCEPT
+iptables -A FORWARD -i $PRIV_INT -s $VOIP_ADDRS -o $DMZ_INT -j ACCEPT
+iptables -A FORWARD -i $PRIV_INT -s $MULTI_ADDRS -j ACCEPT
+iptables -A FORWARD -i $VPNZ_INT -o $PRIV_INT -d $VOIP_ADDRS -j ACCEPT
+iptables -A FORWARD -i $VPNZ_INT -o $PRIV_INT -s 192.168.91.0/24 -d 192.168.2.54 -j ACCEPT
+######################################
+# DNS LAN clients to private server (53)
+echo "DNS Client"
+for NS_ADDRS in $FW_NS_ADDRS
+do
+iptables -A FORWARD -o $DMZ_INT -p tcp \
+        -s $LRCORP_ADDRS --sport $UNPRIVPORTS \
+        -d $NS_ADDRS --dport 53 \
+        -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -o $DMZ_INT -p udp \
+        -s $LRCORP_ADDRS --sport $UNPRIVPORTS \
+        -d $NS_ADDRS --dport 53 \
+        -m state --state NEW -j ACCEPT
+#------------------------------------------------------------
+iptables -A OUTPUT -o $DMZ_INT -p udp \
+        -s $DMZ_IPADDR --sport $UNPRIVPORTS \
+        -d $NS_ADDRS --dport 53 \
+        -m state --state NEW -j ACCEPT
+
+iptables -A OUTPUT -o $DMZ_INT -p tcp \
+        -s $DMZ_IPADDR --sport $UNPRIVPORTS \
+        -d $NS_ADDRS --dport 53 \
+        -m state --state NEW -j ACCEPT
+done
+
+###############################################################
+# Stealth Scans and TCP State Flags
+echo "Stealth scan protection"
+# All of the bits are cleared
+iptables -A INPUT -p tcp --tcp-flags ALL NONE -j DROP
+iptables -A FORWARD -p tcp --tcp-flags ALL NONE -j DROP
+
+# SYN and FIN are both set
+
+iptables -A INPUT -p tcp --tcp-flags SYN,FIN SYN,FIN -j DROP
+iptables -A FORWARD -p tcp --tcp-flags SYN,FIN SYN,FIN -j DROP
+
+# SYN and RST are both set
+
+iptables -A INPUT -p tcp --tcp-flags SYN,RST SYN,RST -j DROP
+iptables -A FORWARD -p tcp --tcp-flags SYN,RST SYN,RST -j DROP
+
+# FIN and RST are both set
+
+iptables -A INPUT -p tcp --tcp-flags FIN,RST FIN,RST -j DROP
+iptables -A FORWARD -p tcp --tcp-flags FIN,RST FIN,RST -j DROP
+
+# FIN is the only bit set, without the expected accompanying ACK
+iptables -A INPUT -p tcp --tcp-flags ACK,FIN FIN -j DROP
+iptables -A FORWARD -p tcp --tcp-flags ACK,FIN FIN -j DROP
+
+# PSH is the only bit set, without the expected accompanying ACK
+iptables -A INPUT -p tcp --tcp-flags ACK,PSH PSH -j DROP
+iptables -A FORWARD -p tcp --tcp-flags ACK,PSH PSH -j DROP
+
+# URG is the only bit set, without the expected accompanying ACK
+iptables -A INPUT -p tcp --tcp-flags ACK,URG URG -j DROP
+iptables -A FORWARD -p tcp --tcp-flags ACK,URG URG -j DROP
+
+###############################################################
+# Using Connection State to By-pass Rule Checking
+echo "Connection State Tracking: ON"
+# Using the state module alone, INVALID will break protocols that use
+# bidirectional connections or multiple connections or exchanges,
+# unless an ALG is provided for the protocol. At this time, FTP is the
+# only protocol with ALG support.
+
+if [ "$CONNECTION_TRACKING" = "1" ]; then
+iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+iptables -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+iptables -A INPUT -m state --state INVALID -j LOG \
+        --log-prefix "INVALID input: "
+iptables -A INPUT -m state --state INVALID -j DROP
+
+iptables -A OUTPUT -m state --state INVALID -j LOG \
+        --log-prefix "INVALID output: "
+iptables -A OUTPUT -o $DMZ_INT -m state --state INVALID -j DROP
+iptables -A OUTPUT -o $VPNZ_INT -m state --state INVALID -j DROP
+
+iptables -A FORWARD -m state --state INVALID -j LOG \
+        --log-prefix "INVALID forward: "
+iptables -A FORWARD -m state --state INVALID -j DROP
+fi
+###############################################################
+# Source Address Spoofing and Other Bad Addresses
+echo "Spoofing protection"
+# Refuse spoofed packets pretending to be from you
+iptables -A INPUT -i $DMZ_INT -s $DMZ_IPADDR -j DROP
+iptables -A INPUT -i $PRIV_INT -s $PRIV_IPADDR -j DROP
+iptables -A INPUT -i $VPNZ_INT -s $VPNZ_IPADDR -j DROP
+
+iptables -A FORWARD -i $DMZ_INT -s $DMZ_IPADDR -j DROP
+iptables -A FORWARD -i $PRIV_INT -s $PRIV_IPADDR -j DROP
+iptables -A FORWARD -i $VPNZ_INT -s $VPNZ_IPADDR -j DROP
+
+iptables -A INPUT -i $DMZ_INT -s $PRIV_ADDRS -j DROP
+iptables -A FORWARD -i $DMZ_INT -s $PRIV_ADDRS -j DROP
+
+iptables -A OUTPUT -o $DMZ_INT -s ! $DMZ_IPADDR -j DROP
+iptables -A OUTPUT -o $PRIV_INT -s ! $PRIV_IPADDR -j DROP
+iptables -A OUTPUT -o $VPNZ_INT -s ! $VPNZ_IPADDR -j DROP
+
+# Refuse packets claiming to be from private networks
+
+iptables -A INPUT -i $DMZ_INT -s $CLASS_A -j DROP
+iptables -A INPUT -i $DMZ_INT -s $CLASS_B -j DROP
+#iptables -A INPUT -i $DMZ_INT -s $CLASS_C -j DROP
+iptables -A INPUT -i $DMZ_INT -s $CLASS_D_MULTICAST -j DROP
+iptables -A INPUT -i $DMZ_INT -s $CLASS_E_RESERVED_NET -j DROP
+iptables -A INPUT -i $DMZ_INT -s $LOOPBACK -j DROP
+
+iptables -A INPUT -i $VPNZ_INT -s $CLASS_A -j DROP
+#iptables -A INPUT -i $VPNZ_INT -s $CLASS_B -j DROP
+#iptables -A INPUT -i $VPNZ_INT -s $CLASS_C -j DROP
+iptables -A INPUT -i $VPNZ_INT -s $CLASS_D_MULTICAST -j DROP
+iptables -A INPUT -i $VPNZ_INT -s $CLASS_E_RESERVED_NET -j DROP
+iptables -A INPUT -i $VPNZ_INT -s $LOOPBACK -j DROP
+
+iptables -A INPUT -i $PRIV_INT -s $LOOPBACK -j DROP
+
+iptables -A INPUT -i $PRIV_INT -s $BROADCAST_SRC -j LOG
+iptables -A INPUT -i $PRIV_INT -s $BROADCAST_SRC -j DROP
+
+iptables -A INPUT -i $DMZ_INT -s $BROADCAST_SRC -j LOG
+iptables -A INPUT -i $DMZ_INT -s $BROADCAST_SRC -j DROP
+
+iptables -A INPUT -i $VPNZ_INT -s $BROADCAST_SRC -j LOG
+iptables -A INPUT -i $VPNZ_INT -s $BROADCAST_SRC -j DROP
+
+iptables -A INPUT -i $PRIV_INT -s $BROADCAST_DEST -j LOG
+iptables -A INPUT -i $PRIV_INT -s $BROADCAST_DEST -j DROP
+
+iptables -A INPUT -i $DMZ_INT -s $BROADCAST_DEST -j LOG
+iptables -A INPUT -i $DMZ_INT -s $BROADCAST_DEST -j DROP
+
+iptables -A INPUT -i $VPNZ_INT -s $BROADCAST_DEST -j LOG
+iptables -A INPUT -i $VPNZ_INT -s $BROADCAST_DEST -j DROP
+
+iptables -A INPUT -i $PRIV_INT -s 0.0.0.0/8 -j DROP
+iptables -A INPUT -i $PRIV_INT -s 169.254.0.0/16 -j DROP
+iptables -A INPUT -i $PRIV_INT -s 192.0.2.0/24 -j DROP
+
+iptables -A INPUT -i $DMZ_INT -s 0.0.0.0/8 -j DROP
+iptables -A INPUT -i $DMZ_INT -s 169.254.0.0/16 -j DROP
+iptables -A INPUT -i $DMZ_INT -s 192.0.2.0/24 -j DROP
+
+iptables -A INPUT -i $VPNZ_INT -s 0.0.0.0/8 -j DROP
+iptables -A INPUT -i $VPNZ_INT -s 169.254.0.0/16 -j DROP
+iptables -A INPUT -i $VPNZ_INT -s 192.0.2.0/24 -j DROP
+#---------------------------------------------------
+
+# Refuse malformed broadcast packets
+iptables -A INPUT -i $PRIV_INT -d $BROADCAST_SRC -j DROP
+iptables -A INPUT -i $DMZ_INT  -d $BROADCAST_SRC -j DROP
+iptables -A INPUT -i $VPNZ_INT -d $BROADCAST_SRC -j DROP
+
+# Don't forward directed broadcasts
+iptables -A FORWARD -i $PRIV_INT -o $DMZ_INT \
+        -d $DMZ_NET -j DROP
+
+iptables -A FORWARD -i $PRIV_INT -o $DMZ_INT \
+        -d $DMZ_BCAST -j DROP
+
+iptables -A FORWARD -i $PRIV_INT -o $VPNZ_INT \
+        -d $VPNZ_NET -j DROP
+
+iptables -A FORWARD -i $PRIV_INT -o $VPNZ_INT \
+        -d $VPNZ_BCAST -j DROP
+#--------------------------------------------------------------
+iptables -A FORWARD -i $DMZ_INT -o $PRIV_INT \
+        -d $PRIV_NET -j DROP
+
+iptables -A FORWARD -i $DMZ_INT -o $PRIV_INT \
+        -d $PRIV_BCAST -j DROP
+
+iptables -A FORWARD -i $DMZ_INT -o $VPNZ_INT \
+        -d $VPNZ_NET -j DROP
+
+iptables -A FORWARD -i $DMZ_INT -o $VPNZ_INT \
+        -d $VPNZ_BCAST -j DROP
+#--------------------------------------------------------------
+iptables -A FORWARD -i $VPNZ_INT -o $DMZ_INT \
+        -d $DMZ_NET -j DROP
+
+iptables -A FORWARD -i $VPNZ_INT -o $DMZ_INT \
+        -d $DMZ_BCAST -j DROP
+
+iptables -A FORWARD -i $VPNZ_INT -o $PRIV_INT \
+        -d $PRIV_NET -j DROP
+
+iptables -A FORWARD -i $VPNZ_INT -o $PRIV_INT \
+        -d $PRIV_BCAST -j DROP
+
+# Don't forward limited broadcasts in either direction
+iptables -A FORWARD -d $BROADCAST_DEST -j DROP
+
+iptables -A INPUT -p udp -d $CLASS_D_MULTICAST -j DROP
+iptables -A FORWARD -p udp -d $CLASS_D_MULTICAST -j DROP
+
+###############################################################
+# Avoid ports subject to protocol and system administration problems
+echo "DROP/REJECT NFS, SOCKS, X-WINDOWS"
+# TCP unprivileged ports
+# Deny connection requests to NFS, SOCKS and X Window ports
+
+iptables -A OUTPUT -o $DMZ_INT -p tcp --syn \
+         --destination-port $XWINDOW_PORTS -j REJECT
+
+iptables -A OUTPUT -o $VPNZ_INT -p tcp --syn \
+         --destination-port $XWINDOW_PORTS -j REJECT
+
+iptables -A INPUT -i $DMZ_INT -p tcp --syn \
+         --destination-port $XWINDOW_PORTS -j DROP
+
+iptables -A INPUT -i $VPNZ_INT -p tcp --syn \
+         --destination-port $XWINDOW_PORTS -j DROP
+
+iptables -A OUTPUT -o $DMZ_INT -p tcp \
+         -m multiport --destination-port \
+         $NFS_PORT,$OPENWINDOWS_PORT,$SOCKS_PORT,$SQUID_PORT \
+         --syn -j REJECT
+
+iptables -A OUTPUT -o $VPNZ_INT -p tcp \
+         -m multiport --destination-port \
+         $NFS_PORT,$OPENWINDOWS_PORT,$SOCKS_PORT,$SQUID_PORT \
+         --syn -j REJECT
+
+iptables -A INPUT -i $DMZ_INT -p tcp \
+         -m multiport --destination-port \
+         $NFS_PORT,$OPENWINDOWS_PORT,$SOCKS_PORT,$SQUID_PORT \
+         --syn -j DROP
+
+iptables -A INPUT -i $VPNZ_INT -p tcp \
+         -m multiport --destination-port \
+         $NFS_PORT,$OPENWINDOWS_PORT,$SOCKS_PORT \
+         --syn -j DROP
+
+# UDP unprivileged ports
+# Deny connection requests to NFS and lockd ports
+
+if [ "$CONNECTION_TRACKING" = "1" ]; then
+iptables -A OUTPUT -o $DMZ_INT -p udp \
+         -m multiport --destination-port $NFS_PORT,$LOCKD_PORT \
+         -m state --state NEW -j REJECT
+
+iptables -A OUTPUT -o $VPNZ_INT -p udp \
+         -m multiport --destination-port $NFS_PORT,$LOCKD_PORT \
+         -m state --state NEW -j REJECT
+
+iptables -A INPUT -i $DMZ_INT -p udp \
+         -m multiport --destination-port $NFS_PORT,$LOCKD_PORT \
+         -m state --state NEW -j DROP
+
+iptables -A INPUT -i $VPNZ_INT -p udp \
+         -m multiport --destination-port $NFS_PORT,$LOCKD_PORT \
+         -m state --state NEW -j DROP
+else
+iptables -A OUTPUT -o $DMZ_INT -p udp \
+         -m multiport --destination-port $NFS_PORT,$LOCKD_PORT \
+          -j REJECT
+
+iptables -A OUTPUT -o $VPNZ_INT -p udp \
+         -m multiport --destination-port $NFS_PORT,$LOCKD_PORT \
+          -j REJECT
+
+iptables -A INPUT -i $DMZ_INT -p udp \
+         -m multiport --destination-port $NFS_PORT,$LOCKD_PORT \
+         -j DROP
+
+iptables -A INPUT -i $VPNZ_INT -p udp \
+         -m multiport --destination-port $NFS_PORT,$LOCKD_PORT \
+         -j DROP
+
+fi
+
+###############################################################
+echo "TraceRoute"
+
+iptables -A FORWARD -i $PRIV_INT -o $DMZ_INT -p udp \
+         --dport $TRACEROUTE_DEST_PORTS -j ACCEPT
+
+iptables -A OUTPUT -o $DMZ_INT -p udp \
+         --dport $TRACEROUTE_DEST_PORTS -j ACCEPT
+
+iptables -A OUTPUT -o $PRIV_INT -p udp \
+         --dport $TRACEROUTE_DEST_PORTS -j ACCEPT
+
+##################################################
+# ICMP Control and Status Messages
+echo "ICMP"
+# Log and drop initial ICMP fragments
+iptables -A INPUT --fragment -p icmp -j LOG \
+--log-prefix "Fragmented incoming ICMP: "
+iptables -A INPUT --fragment -p icmp -j DROP
+
+iptables -A OUTPUT --fragment -p icmp -j LOG \
+--log-prefix "Fragmented outgoing ICMP: "
+iptables -A OUTPUT --fragment -p icmp -j DROP
+
+iptables -A FORWARD --fragment -p icmp -j LOG \
+--log-prefix "Fragmented forwarded ICMP: "
+iptables -A FORWARD --fragment -p icmp -j DROP
+
+iptables -A INPUT -i $DMZ_INT -p icmp \
+--icmp-type source-quench -d $DMZ_IPADDR -j ACCEPT
+
+iptables -A INPUT -i $VPNZ_INT -p icmp \
+--icmp-type source-quench -d $DMZ_IPADDR -j ACCEPT
+
+iptables -A OUTPUT -o $DMZ_INT -p icmp \
+-s $DMZ_IPADDR --icmp-type source-quench -j ACCEPT
+
+iptables -A OUTPUT -o $VPNZ_INT -p icmp \
+-s $DMZ_IPADDR --icmp-type source-quench -j ACCEPT
+
+#iptables -A FORWARD -p icmp \
+#--icmp-type source-quench -j ACCEPT
+
+iptables -A INPUT -i $DMZ_INT -p icmp \
+--icmp-type parameter-problem -d $DMZ_IPADDR -j ACCEPT
+
+iptables -A INPUT -i $VPNZ_INT -p icmp \
+--icmp-type parameter-problem -d $DMZ_IPADDR -j ACCEPT
+
+iptables -A OUTPUT -o $DMZ_INT -p icmp \
+-s $DMZ_IPADDR --icmp-type parameter-problem -j ACCEPT
+
+iptables -A OUTPUT -o $VPNZ_INT -p icmp \
+-s $DMZ_IPADDR --icmp-type parameter-problem -j ACCEPT
+
+#iptables -A FORWARD -p icmp \
+#--icmp-type parameter-problem -j ACCEPT
+
+iptables -A INPUT -i $DMZ_INT -p icmp \
+--icmp-type destination-unreachable -d $DMZ_IPADDR -j ACCEPT
+
+iptables -A INPUT -i $VPNZ_INT -p icmp \
+--icmp-type destination-unreachable -d $DMZ_IPADDR -j ACCEPT
+
+iptables -A OUTPUT -o $DMZ_INT -p icmp \
+-s $DMZ_IPADDR --icmp-type destination-unreachable -j ACCEPT
+
+iptables -A OUTPUT -o $VPNZ_INT -p icmp \
+-s $DMZ_IPADDR --icmp-type destination-unreachable -j ACCEPT
+
+#iptables -A FORWARD -o $PRIV_INT -p icmp \
+#--icmp-type destination-unreachable -d $PRIV_ADDRS -j ACCEPT
+
+iptables -A OUTPUT -o $DMZ_INT -p icmp \
+-s $DMZ_IPADDR --icmp-type fragmentation-needed -j ACCEPT
+
+iptables -A OUTPUT -o $VPNZ_INT -p icmp \
+-s $DMZ_IPADDR --icmp-type fragmentation-needed -j ACCEPT
+
+iptables -A FORWARD -p icmp \
+--icmp-type fragmentation-needed -j ACCEPT
+
+# Don't log dropped outgoing ICMP error messages
+iptables -A OUTPUT -p icmp \
+--icmp-type destination-unreachable -j DROP
+
+iptables -A FORWARD -o $DMZ_INT -p icmp \
+--icmp-type destination-unreachable -j DROP
+
+iptables -A FORWARD -o $VPNZ_INT -p icmp \
+--icmp-type destination-unreachable -j DROP
+
+# Intermediate traceroute responses
+iptables -A INPUT -i $DMZ_INT -p icmp \
+--icmp-type time-exceeded -d $DMZ_IPADDR -j ACCEPT
+
+iptables -A INPUT -i $VPNZ_INT -p icmp \
+--icmp-type time-exceeded -d $DMZ_IPADDR -j ACCEPT
+
+iptables -A FORWARD -o $PRIV_INT -p icmp \
+--icmp-type time-exceeded -j ACCEPT
+
+iptables -A OUTPUT -o $PRIV_INT -p icmp \
+--icmp-type time-exceeded -j ACCEPT
+
+echo "Incoming Pings"
+# allow incoming pings from trusted hosts
+iptables -A INPUT -i $DMZ_INT -p icmp \
+        -s $DMZ_ADDRS --icmp-type echo-request -d $DMZ_IPADDR \
+        -m state --state NEW -j ACCEPT
+
+iptables -A INPUT -i $VPNZ_INT -p icmp \
+        -s $VPNZ_ADDRS --icmp-type echo-request -d $VPNZ_IPADDR \
+        -m state --state NEW -j ACCEPT
+
+iptables -A INPUT -i $PRIV_INT -p icmp \
+        -s $LRCORP_ADDRS --icmp-type echo-request -d $PRIV_IPADDR \
+        -m state --state NEW -j ACCEPT
+
+echo "Outgoing Pings"
+# allow outgoing pings to anywhere
+
+iptables -A OUTPUT -p icmp \
+        --icmp-type echo-request \
+        -m state --state NEW -j ACCEPT
+
+###############################################################
+echo "TMPNET"
+iptables -A PREROUTING -i $PRIV_INT -t mangle \
+         -s $TMPNET -j MARK --set-mark 1
+
+iptables -A FORWARD -i $PRIV_INT -o $VPNZ_INT \
+        -s $TMPNET \
+        -d $ANY \
+        -m state --state NEW -j ACCEPT
+
+###############################################################
+echo "Ash Grove"
+for ASHGROVE_ADDRS in `cat $FW_ASHGROVE_ADDRS`
+do
+for PRINTER_ADDRS in `cat $FW_PRINTER_ADDRS`
+do
+
+iptables -A FORWARD -i $VPNZ_INT -o $PRIV_INT -p icmp \
+        -s $ASHGROVE_ADDRS \
+        -d $PRINTER_ADDRS \
+        -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -i $VPNZ_INT -o $PRIV_INT -p tcp \
+        -s $ASHGROVE_ADDRS  --sport $UNPRIVPORTS \
+        -d $PRINTER_ADDRS --dport 9100 \
+        -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -i $PRIV_INT -o $VPNZ_INT -p icmp \
+        -s $LRCORP_ADDRS \
+        -d $ASHGROVE_ADDRS \
+        -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -i $PRIV_INT -o $VPNZ_INT -p tcp -m multiport \
+        -s $LRCORP_ADDRS \
+        -d $ASHGROVE_ADDRS --dport 80,443,1521,3389,8080 \
+        -m state --state NEW -j ACCEPT
+done
+done
+#########################################
+echo "Client/Server Services"
+###############################################################
+
+if [ "$EXCHANGE_EN" = "1" ]; then
+iptables -A FORWARD -o $PRIV_INT \
+         -s $EXCHANGE -m state --state NEW -j ACCEPT
+fi
+
+iptables -A FORWARD -o $DMZ_INT \
+         -d $WEBMAIL -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -o $DMZ_INT \
+         -d $EXCHANGE -m state --state NEW -j ACCEPT
+
+#iptables -A FORWARD -i $PRIV_INT -o $DMZ_INT \
+ #        -s 192.168.1.0/24 \
+  #       -d $EXCHANGE -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -i $DMZ_INT -o $PRIV_INT -p tcp \
+         -s $EXCHANGE \
+         -d 192.168.1.251 --dport 7080 -m state --state NEW -j ACCEPT
+
+###############################################################
+# Allows Admins to ping and ssh to VPNs
+iptables -A FORWARD -i $VPNZ_INT -o $VPNZ_INT -p icmp \
+        -s $ANY  -d $ANY -j ACCEPT
+
+iptables -A FORWARD -i $VPNZ_INT -o $VPNZ_INT -p tcp \
+        -s $ANY --sport 22 -d $ANY -j ACCEPT
+
+###############################################################
+echo "NetMon and SpamFW" 
+iptables -A FORWARD -i $PRIV_INT -p icmp \
+        -s $NETMON --icmp-type echo-request \
+        -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -i $PRIV_INT -o $DMZ_INT -p tcp -m multiport \
+        -s $NETMON \
+        -d $ANY --dport 25,80 \
+        -m state --state NEW -j ACCEPT
+
+###############################################################
+echo "Admin Services"
+iptables -A FORWARD -i $PRIV_INT \
+         -s ! $FW_ALM_ADDRS \
+         -d 192.168.252.0/22 \
+         -m state --state NEW -j DROP
+for ADMIN_ADDRS in `cat $FW_ADMIN_ADDRS`
+do
+
+iptables -A INPUT -i $PRIV_INT \
+         -s $ADMIN_ADDRS -m state --state NEW -j ACCEPT
+
+iptables -A INPUT -i $VPNZ_INT \
+         -s $ADMIN_ADDRS -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -i $PRIV_INT \
+         -s $ADMIN_ADDRS -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -i $VPNZ_INT \
+         -s $ADMIN_ADDRS -m state --state NEW -j ACCEPT
+done
+
+######################################
+# Avamar
+echo "Avamar"
+
+iptables -A FORWARD -i $DMZ_INT -o $PRIV_INT -p tcp -m multiport \
+        -s $EXCHANGE \
+        -d $AVAMAR --dport 27000,28001,28002,29000 \
+        -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -i $PRIV_INT -o $DMZ_INT -p tcp \
+        -s $AVAMAR \
+        -d $EXCHANGE --dport 28002 \
+        -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -i $PRIV_INT -p icmp \
+        -s $AVAMAR \
+        -d $EXCHANGE \
+        -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -i $DMZ_INT -o $PRIV_INT -p tcp \
+        -s $EXCHANGE \
+        -d $ISPTR --dport 9100 \
+        -m state --state NEW -j ACCEPT
+
+#----------------------------------------------------------------
+for AVAMAR_CLIENTS in `cat $FW_AVAMAR_CLIENTS`
+do
+iptables -A FORWARD -i $VPNZ_INT -o $PRIV_INT -p tcp -m multiport \
+        -s $AVAMAR_CLIENTS \
+        -d $AVAMAR --dport 27000,28001,28002,29000 \
+        -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -i $PRIV_INT -o $VPNZ_INT -p tcp \
+        -s $AVAMAR \
+        -d $AVAMAR_CLIENTS --dport 28002 \
+        -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -i $PRIV_INT -p icmp \
+        -s $AVAMAR \
+        -d $AVAMAR_CLIENTS \
+        -m state --state NEW -j ACCEPT
+done
+######################################
+# SIP
+echo "SIP"
+
+iptables -A FORWARD -p udp -m multiport \
+        -s $ANY \
+        -d $ANY --dport 3478,5060,5062 -j ACCEPT
+
+# RTP stream
+iptables -A FORWARD -p udp \
+        -s $ANY \
+        -d $ANY --dport 10000:20000 -j ACCEPT
+
+iptables -A FORWARD -i VPNZ_INT -o PRIV_INT -p udp \
+        -s $LRCORP_ADDRS \
+        -d 192.168.2.126 --dport 25000:30000 -j ACCEPT
+
+#########################################
+# Allow VPN access to corporate resources
+#########################################
+echo "AD Servers"
+for ADS_ADDRS in `cat $FW_ADS_ADDRS`
+do
+iptables -A FORWARD -o $PRIV_INT -p tcp \
+         -s $LRCORP_ADDRS \
+         -d $ADS_ADDRS --dport 5000:5100 \
+         -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -o $PRIV_INT -p tcp -m multiport \
+         -s $LRCORP_ADDRS \
+         -d $ADS_ADDRS --dport 88,135,389,445,636,3268,3269,6004 \
+         -m state --state NEW -j ACCEPT
+
+#iptables -A FORWARD -o $PRIV_INT -p tcp -m multiport \
+ #        -s $LRCORP_ADDRS \
+  #       -d $ADS_ADDRS --dport 80,88,123,135,139,389,445,636,1103,3268,3269,5049,6004 \
+   #      -m state --state NEW -j ACCEPT
+
+#iptables -A FORWARD -o $PRIV_INT -p tcp \
+ #        -s $LRCORP_ADDRS \
+  #       -d $ADS_ADDRS --dport 1024:1027 \
+   #      -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -o $PRIV_INT -p udp -m multiport \
+         -s $LRCORP_ADDRS \
+         -d $ADS_ADDRS --dport 88,389,5049 \
+         -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -o $PRIV_INT -p icmp \
+         -s $LRCORP_ADDRS \
+         -d $ADS_ADDRS \
+         -m state --state NEW -j ACCEPT
+done
+
+###############################################################
+# Temporary Internet Access
+echo Tmp Inet Access
+for WEB_ADDRS in `cat $FW_WEB_ADDRS`
+do
+iptables -A FORWARD -i $PRIV_INT -o $DMZ_INT -p tcp -m multiport \
+        -s $WEB_ADDRS \
+        -d $ANY --dport 80,443 \
+        -m state --state NEW -j ACCEPT
+done
+###############################################################
+# EPO Internet Access
+
+iptables -A FORWARD -i $PRIV_INT -o $DMZ_INT -p tcp -m multiport \
+        -s $EPO1 \
+        -d $ANY --dport 80,8081 \
+        -m state --state NEW -j ACCEPT
+
+###############################################################
+# Planet Press
+echo "PPRESS"
+iptables -A FORWARD -i $PRIV_INT -o $VPNZ_INT -p tcp \
+        -s $PPRESS \
+        -d $ANY --dport 9100 \
+        -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -i $PRIV_INT -o $VPNZ_INT -p udp \
+        -s $PPRESS \
+        -d $ANY --dport 161 -j ACCEPT
+
+iptables -A FORWARD -i $VPNZ_INT -o $PRIV_INT -p udp \
+        -s $ANY --sport 161 \
+        -d $PPRESS -j ACCEPT
+
+##################################################################
+echo "VNC"
+
+iptables -A FORWARD -i $PRIV_INT -o $VPNZ_INT -p tcp \
+         -s gen1hrlrc.lrcorp.prv --sport $UNPRIVPORTS \
+         -d $LRCORP_ADDRS --dport 5900 \
+         -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -i $PRIV_INT -o $VPNZ_INT -p tcp \
+         -s pay1hrlrc.lrcorp.prv --sport $UNPRIVPORTS \
+         -d $LRCORP_ADDRS --dport 5900 \
+         -m state --state NEW -j ACCEPT
+
+##################################################################
+# VPN--->DMZ
+iptables -A FORWARD -i $VPNZ_INT -o $DMZ_INT -p tcp -m multiport \
+         -s $LRCORP_ADDRS \
+         -d $DMZ_ADDRS --dport 25,53,110,389,443,3128,6001,6002,6004 \
+         -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -i $VPNZ_INT -o $DMZ_INT -p udp -m multiport \
+         -s $LRCORP_ADDRS \
+         -d $DMZ_ADDRS --dport 53,123,500 \
+         -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -i $VPNZ_INT -o $DMZ_INT -p icmp \
+         -s $LRCORP_ADDRS \
+         -d $DMZ_ADDRS -m state --state NEW -j ACCEPT
+
+##############################################################
+# PRV--->DMZ
+
+iptables -A FORWARD -i $PRIV_INT -o $DMZ_INT -p tcp -m multiport \
+         -s $LRCORP_ADDRS \
+         -d $DMZ_ADDRS --dport 25,53,80,81,82,110,135,139,6001,6002,6004 \
+         -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -i $PRIV_INT -o $DMZ_INT -p tcp -m multiport \
+         -s $LRCORP_ADDRS \
+         -d $DMZ_ADDRS --dport 143,389,443,445,1103,1460,3128,8081 \
+         -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -i $PRIV_INT -o $DMZ_INT -p udp -m multiport \
+         -s $LRCORP_ADDRS \
+         -d $DMZ_ADDRS --dport 53,123,137,138,445,500,953,4500 \
+         -m state --state NEW -j ACCEPT
+
+##################################################################
+# VPN--->PRV
+for LRCPRIV_ADDRS in `cat $FW_LRCPRIV_ADDRS`
+do
+iptables -A FORWARD -i $VPNZ_INT -o $PRIV_INT -p tcp -m multiport \
+         -s $LRCORP_ADDRS \
+         -d $LRCPRIV_ADDRS --dport 69,80,81,137,138,139,443,1025,1026,1494,2598,3389,8000,8080,9100 \
+         -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -i $VPNZ_INT -o $PRIV_INT -p tcp -m multiport \
+         -s $LRCORP_ADDRS \
+         -d $LRCPRIV_ADDRS --dport 389,5000,5900,28001 \
+         -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -i $VPNZ_INT -o $PRIV_INT -p tcp \
+         -s 192.168.106.151 \
+         -d $LRCPRIV_ADDRS \
+         -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -i $VPNZ_INT -o $PRIV_INT -p udp -m multiport \
+         -s $LRCORP_ADDRS \
+         -d $LRCPRIV_ADDRS --dport 67,68,69,137,138,389,445,464,500,2105,5060,8080 \
+         -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -i $VPNZ_INT -o $PRIV_INT -p udp \
+         -s $LRCORP_ADDRS \
+         -d $LRCPRIV_ADDRS --dport 1604 -j ACCEPT
+
+iptables -A FORWARD -i $PRIV_INT -o $VPNZ_INT -p udp \
+         -s $LRCPRIV_ADDRS --dport 1604 \
+         -d $LRCORP_ADDRS -j ACCEPT
+
+iptables -A FORWARD -i $VPNZ_INT -o $PRIV_INT -p icmp \
+         -s $LRCORP_ADDRS \
+         -d $LRCPRIV_ADDRS -m state --state NEW -j ACCEPT
+done
+
+iptables -A FORWARD -i $PRIV_INT -o $VPNZ_INT \
+         -s $AVA1 \
+         -d $AVA2 -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -i $VPNZ_INT -o $PRIV_INT \
+         -s $AVA2 \
+         -d $AVA1 -m state --state NEW -j ACCEPT
+
+##############################################################
+# PRV--->VPN
+
+for LRCPRIV_ADDRS in `cat $FW_LRCPRIV_ADDRS`
+do
+iptables -A FORWARD -i $PRIV_INT -o $VPNZ_INT -p tcp -m multiport \
+         -s $LRCPRIV_ADDRS \
+         -d $LRCORP_ADDRS --dport 23,53,80,81,139,337,338,339 \
+         -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -i $PRIV_INT -o $VPNZ_INT -p tcp -m multiport \
+         -s $LRCPRIV_ADDRS \
+         -d $LRCORP_ADDRS --dport 445,5120,5555,6000,7000,8081,8082,9100 \
+         -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -i $PRIV_INT -o $VPNZ_INT -p udp -m multiport \
+         -s $LRCPRIV_ADDRS \
+         -d $LRCORP_ADDRS --dport 53,67,68,161,500 \
+         -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -i $PRIV_INT -o $VPNZ_INT -p icmp \
+         -s $LRCPRIV_ADDRS \
+         -d $LRCORP_ADDRS -m state --state NEW -j ACCEPT
+
+##############################################################
+# DMZ--->PRV
+
+iptables -A FORWARD -i $DMZ_INT -o $PRIV_INT -p tcp \
+         -s 192.168.0.133 \
+         -d 192.168.2.200 --dport 113 \
+         -m state --state NEW -j ACCEPT
+
+#iptables -A FORWARD -i $DMZ_INT -o $PRIV_INT -p udp -m multiport \
+ #        -s $DMZ_ADDRS \
+  #       -d $LRCPRIV_ADDRS --dport 88,137,138,139,389,464,500,749 \
+   #      -m state --state NEW -j ACCEPT
+
+#iptables -A FORWARD -i $DMZ_INT -o $PRIV_INT -p tcp \
+ #        -s $DMZ_ADDRS --sport $UNPRIVPORTS \
+  #       -d $LRCPRIV_ADDRS --dport 5555:5600 \
+   #      -m state --state NEW -j ACCEPT
+
+done
+
+#iptables -A FORWARD -i $DMZ_INT -o $PRIV_INT -p icmp \
+ #        -s $DMZ_ADDRS \
+  #       -d $EPO1 \
+   #      -m state --state NEW -j ACCEPT
+
+##############################################################
+# FTP Server
+echo "FTP Server"
+
+iptables -A INPUT -i $DMZ_INT -p tcp \
+         -s $SPAMFW --sport $UNPRIVPORTS \
+         -d $DMZ_IPADDR --dport 21 \
+         -m state --state NEW -j ACCEPT
+
+iptables -A OUTPUT -o $DMZ_INT -p tcp \
+         -s $DMZ_IPADDR --sport $UNPRIVPORTS \
+         -d $SPAMFW --dport 20 \
+         -m state --state NEW -j ACCEPT
+
+###############################################################
+echo "RSYNC"
+iptables -A OUTPUT -o $PRIV_INT -p tcp \
+        -s $PRIV_IPADDR --sport $UNPRIVPORTS \
+        -d $SYSLOG --dport 873 \
+        -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -o $PRIV_INT -p tcp \
+        -s $DMZ_ADDRS --sport $UNPRIVPORTS \
+        -d $SYSLOG --dport 873 \
+        -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -o $PRIV_INT -p tcp \
+        -s $FDZ_ADDRS --sport $UNPRIVPORTS \
+        -d $SYSLOG --dport 873 \
+        -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -o $PRIV_INT -p tcp \
+        -s $VPNZ_ADDRS --sport $UNPRIVPORTS \
+        -d $SYSLOG --dport 873 \
+        -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -o $PRIV_INT -p udp \
+        -s $VPNZ_ADDRS \
+        -d $SYSLOG --dport 514 \
+        -m state --state NEW -j ACCEPT
+
+###############################################################
+# Filtering the AUTH User Identification Service (TCP Port 113)
+echo "Auth Client"
+iptables -A FORWARD -i $DMZ_INT -o $PRIV_INT -p tcp \
+        -s $WEBPROXY --sport $UNPRIVPORTS --dport 113 \
+        -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -i $PRIV_INT -o $DMZ_INT -p tcp \
+        -s $LRCORP_ADDRS --sport $UNPRIVPORTS --dport 113 \
+        -m state --state NEW -j REJECT
+
+iptables -A FORWARD -i $VPNZ_INT -o $DMZ_INT -p tcp \
+        -s $LRCORP_ADDRS --sport $UNPRIVPORTS --dport 113 \
+        -m state --state NEW -j REJECT
+
+###############################################################
+# Filtering the AUTH Server (TCP Port 113)
+echo "Auth Server"
+iptables -A INPUT -i $DMZ_INT -p tcp \
+        --sport $UNPRIVPORTS \
+        -d $DMZ_IPADDR --dport 113 \
+        -j REJECT --reject-with tcp-reset
+
+###############################################################
+# Sending local Mail to the Exchange Mail Server (TCP Port 25)
+echo "SMTP/LRC Client"
+
+iptables -A OUTPUT -o $DMZ_INT -p tcp \
+        -s $DMZ_IPADDR --sport $UNPRIVPORTS \
+        -d $EXCHANGE --dport 25 \
+        -m state --state NEW -j ACCEPT
+
+###############################################################
+iptables -A OUTPUT -o $DMZ_INT -p tcp \
+        -s $DMZ_IPADDR --sport $UNPRIVPORTS --dport 23 \
+        -m state --state NEW -j ACCEPT
+
+iptables -A OUTPUT -o $VPNZ_INT -p tcp \
+        -s $VPNZ_IPADDR --sport $UNPRIVPORTS --dport 23 \
+        -m state --state NEW -j ACCEPT
+
+###############################################################
+# NetStat
+iptables -A INPUT -i $PRIV_INT -p udp -m multiport \
+        -s $NETSTAT  --dport 161,162 \
+        -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -i $PRIV_INT -p udp -m multiport \
+        -s $NETSTAT  --dport 161,162 \
+        -m state --state NEW -j ACCEPT
+
+###############################################################
+# Printer stat remote gateway
+iptables -A FORWARD -i $PRIV_INT \
+        -s $REMGATE  -d $ANY \
+        -m state --state NEW -j ACCEPT
+
+###############################################################
+# Special Network Access
+echo "Special Access"
+# ftp (TCP Ports 21, 20) 
+# Outgoing Local Client Requests to Remote Servers (Passive mode only!)
+echo " FTP Client"
+for FTP_ADDRS in `cat $FW_FTP_ADDRS`
+do
+iptables -A FORWARD -i $PRIV_INT -o $DMZ_INT -p tcp \
+        -s $FTP_ADDRS --sport $UNPRIVPORTS --dport 21 \
+        -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -i $PRIV_INT -o $DMZ_INT -p tcp \
+        -s $FTP_ADDRS --sport $UNPRIVPORTS --dport $UNPRIVPORTS \
+        -m state --state NEW -j ACCEPT
+done
+iptables -A OUTPUT -o $DMZ_INT -p tcp \
+        -s $DMZ_IPADDR --sport $UNPRIVPORTS --dport 21 \
+        -m state --state NEW -j ACCEPT
+
+iptables -A OUTPUT -o $DMZ_INT -p tcp \
+        -s $DMZ_IPADDR --sport $UNPRIVPORTS --dport $UNPRIVPORTS \
+        -m state --state NEW -j ACCEPT
+
+###############################################################
+echo " NDOR"
+iptables -A FORWARD -i $PRIV_INT -o $DMZ_INT -p tcp -m multiport \
+        -s $LRCORP_ADDRS \
+        -d $NDOR --dport 80,443 \
+        -m state --state NEW -j ACCEPT
+
+echo " GoToMeeting"
+for GTM_ADDRS in `cat $FW_GOTOMEETING_ADDRS`
+do
+iptables -A FORWARD -i $PRIV_INT -o $DMZ_INT -p tcp -m multiport \
+        -s $LRCORP_ADDRS \
+        -d $GTM_ADDRS --dport 80,443,8200 \
+        -m state --state NEW -j ACCEPT
+done
+
+echo " Other"
+for SRVR_ADDRS in `cat $FW_SRVR_ADDRS`
+do
+iptables -A FORWARD -i $PRIV_INT -o $DMZ_INT -p tcp -m multiport \
+        -s $LRCORP_ADDRS \
+        -d $SRVR_ADDRS --dport 21,23,80,135,443,1078,2598,4443,8080,8088,8180,9000,9001,15000,31000 \
+        -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -i $VPNZ_INT -o $DMZ_INT -p tcp -m multiport \
+        -s $LRCORP_ADDRS \
+        -d $SRVR_ADDRS --dport 80,443,8088,15000 \
+        -m state --state NEW -j ACCEPT
+done
+#--------------------------------------------------------------
+###############################################################
+# Accessing Network Time Server (UDP 123)
+# Note: Some client and servers use source port 123
+# when querying a remote server on destination port 123.
+echo "NTP Client"
+iptables -A FORWARD -i $PRIV_INT -o $DMZ_INT -p tcp \
+        -s $PRIV_ADDRS --sport $UNPRIVPORTS --dport 123 \
+        -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -i $VPNZ_INT -o $DMZ_INT -p tcp \
+        -s $PRIV_ADDRS --sport $UNPRIVPORTS --dport 123 \
+        -m state --state NEW -j ACCEPT
+
+iptables -A OUTPUT -o $DMZ_INT -p udp \
+        -s $DMZ_IPADDR --sport 123 --dport 123 \
+        -m state --state NEW -j ACCEPT
+
+###############################################################
+# Logging Rules Prior to Dropping by the Default Policy
+echo "Logging"
+# ICMP rules
+iptables -A INPUT -i $DMZ_INT -p icmp \
+        --icmp-type ! echo-request -m limit -j LOG
+
+iptables -A INPUT -i $VPNZ_INT -p icmp \
+        --icmp-type ! echo-request -m limit -j LOG
+
+# TCP rules
+
+# ftp, telnet, ssh
+iptables -A INPUT -i $DMZ_INT -p tcp \
+         --dport 20:21 -j LOG --log-prefix "DROP FTP: "
+iptables -A INPUT -i $VPNZ_INT -p tcp \
+         --dport 20:21 -j LOG --log-prefix "DROP FTP: "
+iptables -A INPUT -i $DMZ_INT -p tcp \
+         --dport 22 -j LOG --log-prefix "DROP SSH: "
+iptables -A INPUT -i $VPNZ_INT -p tcp \
+         --dport 22 -j LOG --log-prefix "DROP SSH: "
+iptables -A INPUT -i $DMZ_INT -p tcp \
+         --dport 23 -j LOG --log-prefix "DROP Telnet: "
+iptables -A INPUT -i $VPNZ_INT -p tcp \
+         --dport 23 -j LOG --log-prefix "DROP Telnet: "
+
+# http/https
+iptables -A FORWARD -i $PRIV_INT -p tcp \
+         --dport 80 -j LOG --log-prefix "DROP HTTP: "
+iptables -A FORWARD -i $PRIV_INT -p tcp \
+         --dport 443 -j LOG --log-prefix "DROP HTTP: "
+iptables -A FORWARD -i $VPNZ_INT -p tcp \
+         --dport 80 -j LOG --log-prefix "DROP HTTP: "
+iptables -A FORWARD -i $VPNZ_INT -p tcp \
+         --dport 443 -j LOG --log-prefix "DROP HTTP: "
+
+# smtp
+iptables -A INPUT -i $DMZ_INT -p tcp \
+         --dport 25 -j LOG --log-prefix "DROP SMTP: "
+
+#  pop-3
+iptables -A INPUT -i $DMZ_INT -p tcp \
+         --dport 110 -j LOG --log-prefix "DROP POP3: "
+
+# NetBIOS
+iptables -A INPUT -i $DMZ_INT -p tcp \
+         --dport 136:139 -j LOG --log-prefix "DROP NETBIOS: "
+
+# Don't log rejected outgoing ICMP destination-unreachable packets
+iptables -A OUTPUT -o $DMZ_INT -p icmp \
+         --icmp-type destination-unreachable -j DROP
+iptables -A OUTPUT -o $VPNZ_INT -p icmp \
+         --icmp-type destination-unreachable -j DROP
+
+# Log all remaining tcp attempts
+iptables -A INPUT -i $DMZ_INT -p tcp \
+         -d $DMZ_IPADDR -j LOG
+
+iptables -A INPUT -i $DMZ_INT -p udp \
+         -d $DMZ_IPADDR -j LOG
+
+echo "Done"
+exit 0
+
